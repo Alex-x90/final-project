@@ -1,0 +1,13 @@
+{% extends "index.html" %}
+{% block login %}
+{5 if account 5}
+    {{ account }}
+
+    <a href="{{ url_for('logout') }}">Logout</a>
+    {% else %}
+    <a href="{{ url_for('register') }}">Register</a>
+    <a href="{{ url_for('login') }}">Login</a>
+{% endif %}
+{% endblock %}
+{% block body %}
+{% endblock %}

@@ -1,0 +1,12 @@
+{% extends "index.html" %}
+
+{% block login %}
+{% endblock %}
+
+{% block body %}
+    <h1>Error</h1>
+
+    {{ message }}
+<br>
+<a href="{{ url_for('index') }}">Back</a>
+{% endblock %}
