@@ -1,13 +1,53 @@
 {% extends "index.html" %}
 {% block login %}
-{5 if account 5}
-    {{ account }}
+    {% if account %}
+        {{ account }}
 
-    <a href="{{ url_for('logout') }}">Logout</a>
-    {% else %}
-    <a href="{{ url_for('register') }}">Register</a>
-    <a href="{{ url_for('login') }}">Login</a>
-{% endif %}
+        <a href="{{ url_for('logout') }}">Logout</a>
+        {% else %}
+        <a href="{{ url_for('register') }}">Register</a>
+        <a href="{{ url_for('login') }}">Login</a>
+    {% endif %}
 {% endblock %}
 {% block body %}
+<a href="{{ url_for('index') }}">Back</a>
+{% for post in posts %}
+<div class="post">
+    <h1>{{post.title}}</h1>
+    <br>
+    {{post.post|safe}}
+    <br>
+    <br>
+    {{post.time}}
+    <br>
+    User: {{post.username}}
+    <br>
+</div>
+
+{% if account %}
+    <a href="{{ url_for('reply',post_id=post.id) }}">Reply</a>
+{% endif %}
+{% endfor %}
+
+{% for reply in replies %}
+<div class="post">
+    <div class="left">
+        {{reply.post|safe}}
+        <br>
+        <br>
+        {{reply.time}}
+        <br>
+        User:  {{reply.username}}
+        <br>
+    </div>
+    {% if account == reply.username %}
+    <form action="{{ url_for('delete',post_id=reply.id) }}" method="POST">
+        <button class="btn btn-primary right">Delete</button>
+    </form>
+    <form action="{{ url_for('edit',post_id=reply.id) }}" method="GET">
+        <button class="btn btn-primary right">Edit</button>
+    </form>
+    {% endif %}
+</div>
+{% endfor %}
 {% endblock %}

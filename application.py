@@ -1,11 +1,14 @@
 import os
 import requests, json
+from datetime import datetime,timezone,timedelta
 
 from json import loads
 from flask import Flask, session, render_template, jsonify, redirect, request,url_for
 from flask_session import Session
 from sqlalchemy import create_engine
 from sqlalchemy.orm import scoped_session, sessionmaker
+import re
+import lxml.html
 
 app = Flask(__name__)
 
@@ -22,19 +25,153 @@ Session(app)
 engine = create_engine(os.getenv("DATABASE_URL"))
 db = scoped_session(sessionmaker(bind=engine))
 
-@app.route("/" , methods=["GET","POST"])
+# def remove_script(value):
+#     scripts = re.compile(r'<(script).*?</\1>(?s)')
+#     value = scripts.sub('', value)
+#     links = re.compile(r'<(link).*?</\1>(?s)')
+#     value = links.sub('', value)
+#     return value
+
+def replace_url_to_link(value):
+    # Replace url to link
+    urls = re.compile(r"((https?):((//)|(\\\\))+[\w\d:#@%/;$()~_?\+-=\\\.&]*)", re.MULTILINE|re.UNICODE)
+    value = urls.sub(r'<a href="\1" target="_blank">\1</a>', value)
+    # Replace email to mailto
+    urls = re.compile(r"([\w\-\.]+@(\w[\w\-]+\.)+[\w\-]+)", re.MULTILINE|re.UNICODE)
+    value = urls.sub(r'<a href="mailto:\1">\1</a>', value)
+    return value
+
+# TAG_RE = re.compile(r'<[^>]+>')
+# def remove_tags(text):
+#     return TAG_RE.sub('', text)
+
+@app.route("/")
 def index():
-    posts = db.execute("select * from posts order by id desc")
-    return render_template("main.html",account=session["account"],posts=posts)
+    if session.get("account") is None:
+        account = None
+    else:
+        account = session["account"]
+    posts = db.execute("select * from posts where response_to is null order by id desc")
+    return render_template("main.html",account=account,posts=posts)
+
+@app.route("/edit/<post_id>", methods=["GET","POST"])
+def edit(post_id):
+    if request.method == 'GET':
+        if session.get("account") is None:
+            return render_template("error.html", message="You must be logged in to edit a post.")
+        account = str(db.execute("select username from posts where id =:id",{"id":post_id}).fetchone())
+        account = account[:-3]
+        account = account[2:]
+        if(account != session.get("account")):
+            return render_template("error.html", message="You cannot edit someone else's post!")
+        reply = str(db.execute("select response_to from posts where id =:id",{"id":post_id}).fetchone())
+        current_text=str(db.execute("select post from posts where id =:id",{"id":post_id}).fetchone())
+        current_text = current_text[:-3]
+        current_text = current_text[2:]
+        current_text = lxml.html.fromstring(current_text).text_content()
+        if reply == "(None,)":
+            return render_template("new_post.html",account=session["account"],edit=True,post_id=post_id,reply=False,current_text=current_text)
+        current_title = str(db.execute("select title from posts where id =:id",{"id":post_id}).fetchone())
+        current_title = current_title[:-3]
+        current_title = current_title[2:]
+        print(current_title)
+        return render_template("new_post.html",account=session["account"],edit=True,post_id=post_id,reply=True,current_title=current_title,current_text=current_text)
+    if request.method == 'POST':
+        reply = str(db.execute("select response_to from posts where id =:id",{"id":post_id}).fetchone())
+        if reply == "(None,)":
+           reply = None
+        content = request.form.get("text")
+        content = lxml.html.fromstring(content).text_content()
+        content = replace_url_to_link(content)
+        if reply != None:
+            reply = reply[:-2]
+            reply = reply[1:]
+            db.execute("update posts set post = :post where id=:id",{"post":content,"id":post_id})
+            db.commit()
+            return redirect ('/post/'+reply)
+        title = request.form.get("title")
+        db.execute("update posts set title = :title where id=:id",{"id":post_id,"title":title})
+        db.execute("update posts set post = :post where id=:id",{"post":content,"id":post_id})
+        db.commit()
+        return redirect( url_for('index'))
+
+
+@app.route("/delete/<post_id>", methods=["POST"])
+def delete(post_id):
+    account = str(db.execute("select username from posts where id =:id",{"id":post_id}).fetchone())
+    account = account[:-3]
+    account = account[2:]
+    if(account != session.get("account")):
+        return render_template("error.html", message="You cannot delete someone else's post!")
+    reply = str(db.execute("select response_to from posts where id =:id",{"id":post_id}).fetchone())
+    if reply == "(None,)":
+       reply = None
+    db.execute("delete from posts where id = :id",{"id":post_id})
+    db.execute("delete from posts where response_to=:id",{"id":post_id})
+    db.commit()
+    if reply != None:
+        reply = reply[:-2]
+        reply = reply[1:]
+        return redirect ('/post/'+reply)
+    return redirect( url_for('index'))
 
 @app.route("/create_post" , methods=["GET","POST"])
 def new():
+    if request.method == 'GET':
+        if session.get("account") is None:
+            return render_template("error.html", message="You must be logged in to create a new post.")
+        return render_template("new_post.html",account=session["account"])
+    if request.method == 'POST':
+        title = request.form.get("title")
+        content = request.form.get("text")
+        content = lxml.html.fromstring(content).text_content()
+        content = replace_url_to_link(content)
+        username = session["account"]
+        time = datetime.now(timezone(-timedelta(hours=4),"EST" )).strftime('%Y-%m-%d %H:%M:%S %Z')
+        db.execute("insert into posts (title,post,username,time) values (:title,:post,:username,:time)",{"title":title,"post":content,"username":username,"time":time})
+        db.commit()
+        post_id = str(db.execute("select id from posts where title = :title and post = :post and username = :username",{"title":title,"post":content,"username":username}).fetchone())
+        post_id = post_id[:-2]
+        post_id = post_id[1:]
+        return redirect( url_for('post',post_id=post_id))
 
+@app.route("/reply/<post_id>", methods=["GET","POST"])
+def reply(post_id):
+    if request.method == 'GET':
+        if session.get("account") is None:
+            return render_template("error.html", message="You must be logged in to reply to a post.")
+        return render_template("new_post.html",account=session["account"],reply=True,post_id=post_id)
+    if request.method == 'POST':
+        content = request.form.get("text")
+        content = lxml.html.fromstring(content).text_content()
+        content = replace_url_to_link(content)
+        username = session["account"]
+        time = datetime.now(timezone(-timedelta(hours=4),"EST" )).strftime('%Y-%m-%d %H:%M:%S %Z')
+        db.execute("insert into posts (post,username,time,response_to) values (:post,:username,:time,:response_to)",{"post":content,"username":username,"response_to":post_id,"time":time})
+        db.commit()
+        return redirect( url_for('post',post_id=post_id))
 
-@app.route("/post/<int:post_id>" , methods=["GET","POST"])
+@app.route("/post/<post_id>" , methods=["GET","POST"])
 def post(post_id):
-    post = db.execute("select * from posts where id = :id",{"id":post_id})
-    return render_template("post.html",account=session["account"],post=post)
+    if session.get("account") is None:
+        account = None
+    else:
+        account = session["account"]
+    reply = str(db.execute("select response_to from posts where id =:id",{"id":post_id}).fetchone())
+    if reply != "(None,)":
+        post_id = reply[:-2]
+        post_id = post_id[1:]
+    posts = db.execute("select * from posts where id = :id",{"id":post_id})
+    replies = db.execute("select * from posts where response_to = :id order by id desc",{"id":post_id})
+    return render_template("post.html",account=account,posts=posts,replies=replies)
+
+
+
+
+
+
+
+
 
 @app.route("/register" , methods=["GET","POST"])
 def register():
@@ -44,7 +181,6 @@ def register():
         username = request.form.get("username")
         password = request.form.get("password")
         #gets username and password from form.
-
 
         #checks if that username is already in the database. if results are none it means it isnt and it tries to store the username and password entered. otherwise it gives an error.
         if db.execute("SELECT * FROM accounts WHERE username = :username", {"username": username}).rowcount != 0:
@@ -57,7 +193,7 @@ def register():
 def logout():
     #logs the user out by deleting informtion from the session that stores their information
     session["account"] = None
-    return render_template("login.html")
+    return redirect( url_for('index'))
 
 @app.route("/login" , methods=["GET", "POST"])
 def login():
@@ -70,14 +206,9 @@ def login():
 
         #checks if the users username and password match up with a username and password pair in the database.
         if db.execute("SELECT * FROM accounts WHERE username = :username and password = :password", {"username": username,"password": password }).rowcount == 0:
-            if db.execute("SELECT * FROM accounts WHERE username = :username ", {"username": username}).rowcount == 0:
-                return render_template("error.html", message="That account doesn't exist")
-            return render_template("error.html", message="You entered the incorrect password")
+            return render_template("error.html", message="If that account exists your credentials were incorrect.")
         else:
-
-            #sets up the account session if there isn't one so that if the user logs in the website can store their username and display it.
             if session.get("account") is None:
                 session["account"] = []
-            data_request = 1
             session["account"] = username
-            return render_template("main.html", account = session["account"])
+            return redirect( url_for('index'))

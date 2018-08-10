@@ -1,0 +1,32 @@
+.post_link{
+    background-color:black;
+    color:lime;
+    margin:10px;
+    padding:5px;
+    overflow: auto;
+}
+
+body{
+    background-color:darkgray;
+}
+
+.post{
+    background-color:black;
+    color:lime;
+    margin:10px;
+    padding:5px;
+    overflow: auto;
+}
+
+textarea{
+    width:100%;
+}
+
+.right{
+    float:right;
+    margin:3px;
+}
+
+.left{
+    float:left;
+}
