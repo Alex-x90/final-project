@@ -70,12 +70,11 @@ def edit(post_id):
         current_text = current_text[2:]
         current_text = lxml.html.fromstring(current_text).text_content()
         if reply == "(None,)":
-            return render_template("new_post.html",account=session["account"],edit=True,post_id=post_id,reply=False,current_text=current_text)
-        current_title = str(db.execute("select title from posts where id =:id",{"id":post_id}).fetchone())
-        current_title = current_title[:-3]
-        current_title = current_title[2:]
-        print(current_title)
-        return render_template("new_post.html",account=session["account"],edit=True,post_id=post_id,reply=True,current_title=current_title,current_text=current_text)
+            current_title = str(db.execute("select title from posts where id =:id",{"id":post_id}).fetchone())
+            current_title = current_title[:-3]
+            current_title = current_title[2:]
+            return render_template("new_post.html",account=session["account"],edit=True,post_id=post_id,reply=False,current_text=current_text,current_title=current_title)        
+        return render_template("new_post.html",account=session["account"],edit=True,post_id=post_id,reply=True,current_text=current_text)
     if request.method == 'POST':
         reply = str(db.execute("select response_to from posts where id =:id",{"id":post_id}).fetchone())
         if reply == "(None,)":
