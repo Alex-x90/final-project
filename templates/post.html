@@ -2,8 +2,9 @@
 {% block login %}
     {% if account %}
         {{ account }}
-
-        <a href="{{ url_for('logout',post_id=post.id) }}">Logout</a>
+        {% for post in posts %}
+            <a href="{{ url_for('logout',post_id=post.id) }}">Logout</a>
+        {% endfor %}
         {% else %}
         <a href="{{ url_for('register') }}">Register</a>
         <a href="{{ url_for('login') }}">Login</a>
