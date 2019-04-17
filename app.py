@@ -169,11 +169,11 @@ def register():
         db.commit()
         return render_template("login.html")
 
-@app.route("/logout/<post_id>")
+@app.route("/logout/<post_id>", methods=["GET","POST"])
 def logout():
     #logs the user out by deleting informtion from the session that stores their information
     session["account"] = None
-    if post_id is None:
+    if post_id<0:
         return redirect( url_for('index'))
     else:
         return redirect( url_for('post',post_id=post_id))
