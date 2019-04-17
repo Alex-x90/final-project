@@ -173,6 +173,7 @@ def register():
 def logout(post_id):
     #logs the user out by deleting informtion from the session that stores their information
     session["account"] = None
+    post_id=int(post_id)
     if post_id<0:
         return redirect( url_for('index'))
     else:
