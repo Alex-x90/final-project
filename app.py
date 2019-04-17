@@ -25,13 +25,6 @@ Session(app)
 engine = create_engine(os.getenv("DATABASE_URL"))
 db = scoped_session(sessionmaker(bind=engine))
 
-# def remove_script(value):
-#     scripts = re.compile(r'<(script).*?</\1>(?s)')
-#     value = scripts.sub('', value)
-#     links = re.compile(r'<(link).*?</\1>(?s)')
-#     value = links.sub('', value)
-#     return value
-
 def replace_url_to_link(value):
     # Replace url to link
     urls = re.compile(r"((https?):((//)|(\\\\))+[\w\d:#@%/;$()~_?\+-=\\\.&]*)", re.MULTILINE|re.UNICODE)
@@ -40,10 +33,6 @@ def replace_url_to_link(value):
     urls = re.compile(r"([\w\-\.]+@(\w[\w\-]+\.)+[\w\-]+)", re.MULTILINE|re.UNICODE)
     value = urls.sub(r'<a href="mailto:\1">\1</a>', value)
     return value
-
-# TAG_RE = re.compile(r'<[^>]+>')
-# def remove_tags(text):
-#     return TAG_RE.sub('', text)
 
 @app.route("/")
 def index():
@@ -73,16 +62,14 @@ def edit(post_id):
             current_title = str(db.execute("select title from posts where id =:id",{"id":post_id}).fetchone())
             current_title = current_title[:-3]
             current_title = current_title[2:]
-            return render_template("new_post.html",account=session["account"],edit=True,post_id=post_id,reply=False,current_text=current_text,current_title=current_title)        
+            return render_template("new_post.html",account=session["account"],edit=True,post_id=post_id,reply=False,current_text=current_text,current_title=current_title)
         return render_template("new_post.html",account=session["account"],edit=True,post_id=post_id,reply=True,current_text=current_text)
     if request.method == 'POST':
         reply = str(db.execute("select response_to from posts where id =:id",{"id":post_id}).fetchone())
-        if reply == "(None,)":
-           reply = None
         content = request.form.get("text")
         content = lxml.html.fromstring(content).text_content()
         content = replace_url_to_link(content)
-        if reply != None:
+        if reply != "(None,)":
             reply = reply[:-2]
             reply = reply[1:]
             db.execute("update posts set post = :post where id=:id",{"post":content,"id":post_id})
@@ -103,12 +90,10 @@ def delete(post_id):
     if(account != session.get("account")):
         return render_template("error.html", message="You cannot delete someone else's post!")
     reply = str(db.execute("select response_to from posts where id =:id",{"id":post_id}).fetchone())
-    if reply == "(None,)":
-       reply = None
     db.execute("delete from posts where id = :id",{"id":post_id})
     db.execute("delete from posts where response_to=:id",{"id":post_id})
     db.commit()
-    if reply != None:
+    if reply != "(None,)":
         reply = reply[:-2]
         reply = reply[1:]
         return redirect ('/post/'+reply)
@@ -168,10 +153,6 @@ def post(post_id):
 
 
 
-
-
-
-
 @app.route("/register" , methods=["GET","POST"])
 def register():
     if request.method == 'GET':
@@ -188,11 +169,14 @@ def register():
         db.commit()
         return render_template("login.html")
 
-@app.route("/logout")
+@app.route("/logout/<post_id>")
 def logout():
     #logs the user out by deleting informtion from the session that stores their information
     session["account"] = None
-    return redirect( url_for('index'))
+    if post_id is None:
+        return redirect( url_for('index'))
+    else:
+        return redirect( url_for('post',post_id=post_id))
 
 @app.route("/login" , methods=["GET", "POST"])
 def login():
