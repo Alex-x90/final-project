@@ -147,7 +147,7 @@ def post(post_id):
         post_id = post_id[1:]
     posts = db.execute("select * from posts where id = :id",{"id":post_id})
     replies = db.execute("select * from posts where response_to = :id order by id desc",{"id":post_id})
-    return render_template("post.html",account=account,posts=posts,replies=replies)
+    return render_template("post.html",account=account,posts=posts,replies=replies,post_id=post_id)
 
 
 
