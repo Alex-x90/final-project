@@ -179,10 +179,10 @@ def logout(post_id):
     else:
         return redirect( url_for('post',post_id=post_id))
 
-@app.route("/login" , methods=["GET", "POST"])
-def login():
+@app.route("/login/<post_id>" , methods=["GET", "POST"])
+def login(post_id):
     if request.method == 'GET':
-        return render_template("login.html")
+        return render_template("login.html",post_id=post_id)
     if request.method == 'POST':
 
         username = request.form.get("username")
@@ -195,4 +195,7 @@ def login():
             if session.get("account") is None:
                 session["account"] = []
             session["account"] = username
-            return redirect( url_for('index'))
+            if int(post_id)<0:
+                return redirect( url_for('index'))
+            else:
+                return redirect( url_for('post',post_id=post_id))

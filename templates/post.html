@@ -5,7 +5,7 @@
         <a href="{{ url_for('logout',post_id=post_id) }}">Logout</a>
         {% else %}
         <a href="{{ url_for('register') }}">Register</a>
-        <a href="{{ url_for('login') }}">Login</a>
+        <a href="{{ url_for('login',post_id=post_id) }}">Login</a>
     {% endif %}
 {% endblock %}
 {% block body %}
